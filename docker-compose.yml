@@ -1,0 +1,35 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tiktac-backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend-data:/data
+    environment:
+      - ADDR=:8080
+      - DB_PATH=/data/data.db
+    networks:
+      - tiktac-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tiktac-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - tiktac-network
+
+networks:
+  tiktac-network:
+    driver: bridge
+
+volumes:
+  backend-data:
+

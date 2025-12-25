@@ -1,0 +1,7 @@
+*.db
+*.log
+.git
+*.test
+*.out
+vendor/
+

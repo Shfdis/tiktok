@@ -39,7 +39,12 @@ code {
 .page {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 22px 18px 40px;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: clamp(10px, 2.2vh, 22px) clamp(10px, 2.4vw, 18px) clamp(10px, 2.2vh, 22px);
 }
 
 .topbar {
@@ -133,7 +138,11 @@ code {
 }
 
 .boardWrap {
-  margin-top: 18px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .meta {
@@ -161,14 +170,24 @@ code {
 .board {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: clamp(6px, calc(var(--boardSize, 480px) / 42), 12px);
+  width: var(--boardSize, 480px);
+  height: var(--boardSize, 480px);
+}
+
+.boardArea {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .localBoard {
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--panel);
-  padding: 10px;
+  padding: clamp(6px, calc(var(--boardSize, 480px) / 60), 10px);
   box-shadow: var(--shadow);
   position: relative;
 }
@@ -186,17 +205,17 @@ code {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 8px;
+  margin-bottom: clamp(4px, calc(var(--boardSize, 480px) / 90), 8px);
 }
 
 .localLabel {
-  font-size: 12px;
+  font-size: clamp(10px, calc(var(--boardSize, 480px) / 55), 12px);
   color: var(--muted);
   font-weight: 700;
 }
 
 .localWinner {
-  font-size: 12px;
+  font-size: clamp(10px, calc(var(--boardSize, 480px) / 55), 12px);
   color: rgba(255, 255, 255, 0.8);
   font-weight: 700;
 }
@@ -204,7 +223,7 @@ code {
 .localGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  gap: clamp(4px, calc(var(--boardSize, 480px) / 75), 7px);
 }
 
 .cell {
@@ -216,7 +235,7 @@ code {
   cursor: pointer;
   color: rgba(255, 255, 255, 0.9);
   font-weight: 900;
-  font-size: 18px;
+  font-size: clamp(12px, calc(var(--boardSize, 480px) / 26), 18px);
   letter-spacing: 0.5px;
   display: grid;
   place-items: center;
@@ -256,12 +275,6 @@ code {
   font-size: 12px;
 }
 
-@media (max-width: 860px) {
-  .board {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 560px) {
   .topbar {
     flex-direction: column;
@@ -269,9 +282,6 @@ code {
   }
   .actions {
     justify-content: flex-start;
-  }
-  .board {
-    grid-template-columns: repeat(1, minmax(0, 1fr));
   }
 }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { findMatch, getState, makeMove } from "./api";
 import type { MyState, Player, State } from "./types";
 import { playerLabel } from "./types";
@@ -23,9 +23,11 @@ export function App() {
   const [state, setState] = useState<State | null>(null);
   const [status, setStatus] = useState<"idle" | "matching" | "playing">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [boardSizePx, setBoardSizePx] = useState<number>(0);
 
   const matchAbortRef = useRef<AbortController | null>(null);
   const latestStateRef = useRef<State | null>(null);
+  const boardAreaRef = useRef<HTMLDivElement | null>(null);
 
   const myRole = session?.role ?? 2;
   const gameId = session?.id ?? null;
@@ -71,6 +73,30 @@ export function App() {
     matchAbortRef.current = null;
     setStatus("idle");
   }
+
+  // Ensure the full 3x3 board always fits on screen: compute a square size from available board area.
+  useLayoutEffect(() => {
+    if (status !== "playing") return;
+    const el = boardAreaRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      // Safety margin so it never touches edges / causes scrollbars.
+      const size = Math.floor(Math.max(0, Math.min(rect.width, rect.height) - 4));
+      setBoardSizePx(size);
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [status]);
 
   // Keep a ref to the latest state so our polling loop doesn't capture stale values.
   useEffect(() => {
@@ -162,7 +188,7 @@ export function App() {
   }, [status]);
 
   return (
-    <div className="page">
+    <div className="page" style={{ ["--boardSize" as any]: `${boardSizePx}px` }}>
       <div className="topbar">
         <div>
           <div className="title">{headline}</div>
@@ -215,42 +241,46 @@ export function App() {
             )}
           </div>
 
-          <div className="board">
-            {state.values.map((row, bx) =>
-              row.map((local, by) => {
-                const forced = allowedBoard ? allowedBoard.bx === bx && allowedBoard.by === by : true;
-                const playable = isPlayableBoard(local.winner);
-                const boardClass =
-                  "localBoard" +
-                  (forced ? " localBoard-forced" : "") +
-                  (playable ? "" : " localBoard-locked");
-                return (
-                  <div key={`${bx}-${by}`} className={boardClass}>
-                    <div className="localTop">
-                      <div className="localLabel">
-                        {bx + 1},{by + 1}
+          <div className="boardArea" ref={boardAreaRef}>
+            <div className="board">
+              {state.values.map((row, bx) =>
+                row.map((local, by) => {
+                  const forced = allowedBoard ? allowedBoard.bx === bx && allowedBoard.by === by : true;
+                  const playable = isPlayableBoard(local.winner);
+                  const boardClass =
+                    "localBoard" +
+                    (forced ? " localBoard-forced" : "") +
+                    (playable ? "" : " localBoard-locked");
+                  return (
+                    <div key={`${bx}-${by}`} className={boardClass}>
+                      <div className="localTop">
+                        <div className="localLabel">
+                          {bx + 1},{by + 1}
+                        </div>
+                        <div className="localWinner">
+                          {local.winner !== 2 ? `Winner: ${playerLabel(local.winner)}` : ""}
+                        </div>
                       </div>
-                      <div className="localWinner">{local.winner !== 2 ? `Winner: ${playerLabel(local.winner)}` : ""}</div>
+                      <div className="localGrid">
+                        {local.values.map((cellsRow, cx) =>
+                          cellsRow.map((cell, cy) => (
+                            <button
+                              key={`${bx}-${by}-${cx}-${cy}`}
+                              className={cellBg(cell)}
+                              onClick={() => void onClickCell(bx, by, cx, cy)}
+                              disabled={!itsMyTurn || cell !== 2 || !playable || (!!allowedBoard && !forced)}
+                              title={`Board ${bx + 1},${by + 1} • Cell ${cx + 1},${cy + 1}`}
+                            >
+                              {playerLabel(cell)}
+                            </button>
+                          )),
+                        )}
+                      </div>
                     </div>
-                    <div className="localGrid">
-                      {local.values.map((cellsRow, cx) =>
-                        cellsRow.map((cell, cy) => (
-                          <button
-                            key={`${bx}-${by}-${cx}-${cy}`}
-                            className={cellBg(cell)}
-                            onClick={() => void onClickCell(bx, by, cx, cy)}
-                            disabled={!itsMyTurn || cell !== 2 || !playable || (!!allowedBoard && !forced)}
-                            title={`Board ${bx + 1},${by + 1} • Cell ${cx + 1},${cy + 1}`}
-                          >
-                            {playerLabel(cell)}
-                          </button>
-                        )),
-                      )}
-                    </div>
-                  </div>
-                );
-              }),
-            )}
+                  );
+                }),
+              )}
+            </div>
           </div>
 
           <div className="footer">

@@ -4,6 +4,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: tiktac-backend
+    ports:
+      - "8080:8080"
     volumes:
       - backend-data:/data
     environment:
@@ -21,6 +23,18 @@ services:
       - backend
     ports:
       - "80:80"
+    networks:
+      - tiktac-network
+
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: tiktac-bot
+    depends_on:
+      - backend
+    environment:
+      - BOT_BASE_URL=http://backend:8080
     networks:
       - tiktac-network
 

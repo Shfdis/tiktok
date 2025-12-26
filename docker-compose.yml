@@ -4,8 +4,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: tiktac-backend
-    ports:
-      - "8080:8080"
     volumes:
       - backend-data:/data
     environment:

@@ -16,41 +16,82 @@ var addr = flag.String("addr", ":8080", "http service address")
 var dbPointer *sql.DB
 var matchUpMutex sync.Mutex
 var first = false
+var matchEpoch uint64
 
 type matchMsg struct {
+	epoch uint64
 	state MyState
 	err   string
 }
 
-// Buffer of 1 prevents deadlocks if one side disconnects or if game creation fails.
-var matchState chan matchMsg = make(chan matchMsg, 1)
+// Buffer >1 helps avoid rare blocking if a stale message is left behind.
+var matchState chan matchMsg = make(chan matchMsg, 8)
 
 func play(ctx *gin.Context) {
 	matchUpMutex.Lock()
 	if first {
+		epoch := matchEpoch
 		state, myId, otherId, err := CreateGame(dbPointer)
 		if err != nil || myId == 0 {
 			// Reset first so next player can try again, and unblock waiting player
 			first = false
-			matchState <- matchMsg{err: "Couldn't create game"}
+			select {
+			case matchState <- matchMsg{epoch: epoch, err: "Couldn't create game"}:
+			default:
+			}
 			matchUpMutex.Unlock()
 			ctx.JSON(500, gin.H{"error": "Couldn't create game"})
 			return
 		}
 		first = false
-		matchState <- matchMsg{state: MyState{Id: otherId, GameState: *state, Role: Circle}}
+		// If the waiting request got cancelled, nobody may be receiving anymore; never block here.
+		select {
+		case matchState <- matchMsg{epoch: epoch, state: MyState{Id: otherId, GameState: *state, Role: Circle}}:
+		default:
+		}
 		ctx.IndentedJSON(200, MyState{Id: myId, GameState: *state, Role: Cross})
 		matchUpMutex.Unlock()
 		return
 	}
 	first = true
+	matchEpoch++
+	myEpoch := matchEpoch
 	matchUpMutex.Unlock()
-	msg := <-matchState
-	if msg.err != "" {
-		ctx.JSON(500, gin.H{"error": msg.err})
-		return
+
+	for {
+		select {
+		case <-ctx.Request.Context().Done():
+			// Cleanup waiting slot if the client cancels while waiting for a match.
+			matchUpMutex.Lock()
+			if first && matchEpoch == myEpoch {
+				first = false
+				matchEpoch++
+			}
+			matchUpMutex.Unlock()
+
+			// Drain any stale messages so they don't affect the next match.
+			for {
+				select {
+				case <-matchState:
+				default:
+					ctx.JSON(408, gin.H{"error": "Match cancelled"})
+					return
+				}
+			}
+
+		case msg := <-matchState:
+			// Ignore stale messages from a previously cancelled waiting request.
+			if msg.epoch != myEpoch {
+				continue
+			}
+			if msg.err != "" {
+				ctx.JSON(500, gin.H{"error": msg.err})
+				return
+			}
+			ctx.IndentedJSON(200, msg.state)
+			return
+		}
 	}
-	ctx.IndentedJSON(200, msg.state)
 }
 func move(ctx *gin.Context) {
 	var moveData Move

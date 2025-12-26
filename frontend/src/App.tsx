@@ -12,6 +12,34 @@ function allowedBoardFromLocation(location: number): { bx: number; by: number } 
   return { bx: Math.floor(location / 3), by: location % 3 };
 }
 
+function hasAnyLegalMove(state: State): boolean {
+  // If a sub-board is forced, you must play there unless it's already won.
+  const forced = allowedBoardFromLocation(state.location);
+
+  const canPlayInBoard = (bx: number, by: number) => {
+    const local = state.values[bx][by];
+    if (!isPlayableBoard(local.winner)) return false;
+    for (let cx = 0; cx < 3; cx++) {
+      for (let cy = 0; cy < 3; cy++) {
+        if (local.values[cx][cy] === 2) return true;
+      }
+    }
+    return false;
+  };
+
+  if (forced) {
+    if (canPlayInBoard(forced.bx, forced.by)) return true;
+  }
+
+  // Otherwise any non-won board with an empty cell is legal.
+  for (let bx = 0; bx < 3; bx++) {
+    for (let by = 0; by < 3; by++) {
+      if (canPlayInBoard(bx, by)) return true;
+    }
+  }
+  return false;
+}
+
 function cellBg(p: Player): string {
   if (p === 0) return "cell cell-x";
   if (p === 1) return "cell cell-o";
@@ -36,6 +64,23 @@ export function App() {
   const itsMyTurn = status === "playing" && myRole !== 2 && toMove === myRole;
 
   const allowedBoard = useMemo(() => (state ? allowedBoardFromLocation(state.location) : null), [state]);
+  const isDraw = useMemo(() => {
+    if (!state) return false;
+    if (state.winner !== 2) return false;
+    return !hasAnyLegalMove(state);
+  }, [state]);
+  const gameEnded = useMemo(() => {
+    if (!state) return false;
+    return state.winner !== 2 || isDraw;
+  }, [state, isDraw]);
+  const endMessage = useMemo(() => {
+    if (!state) return null;
+    if (isDraw) return "Draw";
+    if (state.winner === 2) return null;
+    if (myRole === 2) return `Winner: ${playerLabel(state.winner)}`;
+    if (state.winner === myRole) return "You won";
+    return "You lost";
+  }, [state, myRole, isDraw]);
 
   function resetAll() {
     matchAbortRef.current?.abort();
@@ -150,7 +195,7 @@ export function App() {
   async function onClickCell(bx: number, by: number, cx: number, cy: number) {
     if (!state || !session || !gameId) return;
     if (!itsMyTurn) return;
-    if (state.winner !== 2) return;
+    if (gameEnded) return;
 
     // Enforce allowed board: if location != -1, you must play in that board.
     if (allowedBoard && (allowedBoard.bx !== bx || allowedBoard.by !== by)) return;
@@ -195,10 +240,11 @@ export function App() {
           <div className="subtitle">
             {status === "playing" && state ? (
               <>
-                You are <b>{playerLabel(myRole)}</b> • Turn: <b>{playerLabel(state.to_move)}</b>{" "}
-                {state.winner !== 2 ? (
+                You are <b>{playerLabel(myRole)}</b> • Turn: <b>{playerLabel(state.to_move)}</b>
+                {endMessage ? (
                   <>
-                    • Winner: <b>{playerLabel(state.winner)}</b>
+                    {" "}
+                    • <b>{endMessage}</b>
                   </>
                 ) : null}
               </>
@@ -230,8 +276,20 @@ export function App() {
 
       {status === "playing" && state && session ? (
         <div className="boardWrap">
+          {endMessage ? (
+            <div className={"endBanner" + (endMessage === "You won" ? " endBanner-win" : endMessage === "You lost" ? " endBanner-lose" : " endBanner-draw")}>
+              {endMessage}
+            </div>
+          ) : null}
+
           <div className="meta">
-            {itsMyTurn ? <span className="pill ok">Your move</span> : <span className="pill">Waiting…</span>}
+            {gameEnded ? (
+              <span className="pill">Game ended</span>
+            ) : itsMyTurn ? (
+              <span className="pill ok">Your move</span>
+            ) : (
+              <span className="pill">Waiting…</span>
+            )}
             {allowedBoard ? (
               <span className="pill">
                 Must play in board ({allowedBoard.bx + 1},{allowedBoard.by + 1})
@@ -268,7 +326,7 @@ export function App() {
                               key={`${bx}-${by}-${cx}-${cy}`}
                               className={cellBg(cell)}
                               onClick={() => void onClickCell(bx, by, cx, cy)}
-                              disabled={!itsMyTurn || cell !== 2 || !playable || (!!allowedBoard && !forced)}
+                            disabled={gameEnded || !itsMyTurn || cell !== 2 || !playable || (!!allowedBoard && !forced)}
                               title={`Board ${bx + 1},${by + 1} • Cell ${cx + 1},${cy + 1}`}
                             >
                               {playerLabel(cell)}

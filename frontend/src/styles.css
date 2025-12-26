@@ -114,6 +114,32 @@ code {
   color: rgba(255, 255, 255, 0.9);
 }
 
+.endBanner {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  text-align: center;
+}
+
+.endBanner-win {
+  border-color: rgba(45, 212, 191, 0.45);
+  background: rgba(45, 212, 191, 0.14);
+}
+
+.endBanner-lose {
+  border-color: rgba(251, 113, 133, 0.45);
+  background: rgba(251, 113, 133, 0.14);
+}
+
+.endBanner-draw {
+  border-color: rgba(124, 92, 255, 0.45);
+  background: rgba(124, 92, 255, 0.14);
+}
+
 .empty {
   margin-top: 18px;
 }
